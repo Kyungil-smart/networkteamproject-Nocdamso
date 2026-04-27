@@ -15,9 +15,10 @@ MonoBehaviour:
   PieceName: 
   Type: 0
   ModelPrefab: {fileID: 0}
-  MoveDistance: 0
+  MoveDistance: 1
   CanMoveDiagonally: 0
   CanJump: 0
-  CanDoubleMoveOnFirst: 0
-  CanEnPassant: 0
+  CanDoubleMoveOnFirst: 1
+  CanEnPassant: 1
+  CanCaptureDiagonally: 1
   CanCastling: 0
