@@ -71,9 +71,16 @@ public class PlayerInputManager : MonoBehaviour
         {
             if (hitObj.TryGetComponent(out TileHighlighter tile))
             {
+                // 이동 시 선택 해제
                 if (SelectedPiece.CanMove(tile.GridPos))
                 {
                     SelectedPiece.MovePiece(tile.transform.position, tile.GridPos);
+                    Deselect();
+                }
+
+                // 이동할 수 없는 곳 클릭 시 선택 해제
+                else
+                {
                     Deselect();
                 }
             }

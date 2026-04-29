@@ -7,6 +7,11 @@ public class TileHighlighter : MonoBehaviour
 
     private void Start()
     {
+        if (TileConverter.Instance != null)
+        {
+            GridPos = TileConverter.Instance.WorldToGrid(transform.position);
+        }
+
         if (MoveToTileHighlighter != null)
         {
             MoveToTileHighlighter.SetActive(false);
