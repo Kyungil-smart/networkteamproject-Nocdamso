@@ -14335,7 +14335,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1585112444}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1c982b6230669844ea3b3cb0f96f2285, type: 3}
+  m_Script: {fileID: 11500000, guid: 17a7503861bc1ff499881034545c5308, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GenerateChessPieces
   BoardScript: {fileID: 1909296544}
@@ -16837,6 +16837,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GenerateChessBoard
   DarkTile: {fileID: 6477354029510084268, guid: 7866fe721cacd954aaf769773ed07f16, type: 3}
   LightTile: {fileID: 7655987397791516904, guid: 707a30342b6bfbf48a819b1d6c312fbe, type: 3}
+  TileSize: 2.3
   TileScale: 1.15
 --- !u!4 &1909296545
 Transform:
