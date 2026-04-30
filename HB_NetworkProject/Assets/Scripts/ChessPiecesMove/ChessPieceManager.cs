@@ -1,4 +1,3 @@
-using Unity.Collections;
 using UnityEngine;
 
 public abstract class ChessPieceManager : MonoBehaviour
@@ -29,19 +28,23 @@ public abstract class ChessPieceManager : MonoBehaviour
         }
     }
 
-    public virtual void MovePiece(Vector3 worldPos, Vector2Int gridPos)
+    public virtual void MovePiece(Vector2Int gridPos)
     {
+        // 이전 자리 비우기
         Vector2Int previousPos = this.GridPos;
-
         ChessGameManager.instance.boardLayout[previousPos.x, previousPos.y] = null;
         
-        // 이동
-        transform.position = new Vector3(worldPos.x, transform.position.y, worldPos.z);
+        // TileConverter로 좌표 계산
+        Vector3 targetWorldPos = TileConverter.Instance.GridToWorld(gridPos.x, gridPos.y, transform.position.y);
+
+        // 계산된 위치로 이동
+        transform.position = targetWorldPos;
+
+        // 데이터 갱신
         this.GridPos = gridPos;
         this.isMoved = true;
         
-        Vector2Int currentPos = this.GridPos;
-        ChessGameManager.instance.boardLayout[currentPos.x, currentPos.y] = this;
+        ChessGameManager.instance.boardLayout[gridPos.x, gridPos.y] = this;
     }
 
     // 각 기물별 이동 규칙
