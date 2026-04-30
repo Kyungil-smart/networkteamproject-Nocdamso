@@ -4,20 +4,21 @@ public class Queen : ChessPieceManager
 {
     public override bool CanMove(Vector2Int targetPos)
     {
-        // 현재 위치와 목표 위치 차이 계산
-        int distanceX = Mathf.Abs(targetPos.x - GridPos.x);
-        int distanceY = Mathf.Abs(targetPos.y - GridPos.y);
-
-        // 제자리 클릭 방지
-        if (distanceX == 0 && distanceY == 0) return false;
-
-        // 수평, 수직, 대각 => 룩과 비숍의 로직 합침
-        if (distanceX == distanceY || distanceX == 0 || distanceY == 0)
+        // 보드 밖, 제자리, 아군 위치 체크 and 거리 계산
+        if (!IsMoveValid(targetPos, out int distanceX, out int distanceZ))
         {
-            // TODO: 가는 길에 기물이 있는지 확인 로직 추가
-            return true;
+            return false;
         }
 
-        return false;
+        bool isStraight = (distanceX == 0 || distanceZ == 0);
+        bool isDiagonal = (distanceX == distanceZ);
+
+        if (!isStraight && !isDiagonal)
+        {
+            return false;
+        }
+
+        // 경로상 다른 기물이 없어야 함
+        return !isPathBlocked(targetPos);
     }    
 }

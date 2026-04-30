@@ -4,17 +4,15 @@ public class King : ChessPieceManager
 {
     public override bool CanMove(Vector2Int targetPos)
     {
-        // 현재 위치와 목표 위치 차이 계산
-        int distanceX = Mathf.Abs(targetPos.x - GridPos.x);
-        int distanceY = Mathf.Abs(targetPos.y - GridPos.y);
-
-        // 제자리 클릭 방지
-        if (distanceX == 0 && distanceY == 0) return false;
-
-        // 어느 방향으로든 1칸만 움직일 수 있음
-        if (distanceX <= 1 && distanceY <= 1)
+        // 보드 밖, 제자리, 아군 위치 체크 and 거리 계산
+        if (!IsMoveValid(targetPos, out int distanceX, out int distanceZ))
         {
-            // TODO: 가는 길에 기물이 있는지 확인 로직 추가
+            return false;
+        }
+
+        // 모든 방향으로 1칸 이동(1칸이기 때문에 경로는 탐색할 필요없음)
+        if(distanceX <= 1 && distanceZ <= 1)
+        {
             return true;
         }
 
