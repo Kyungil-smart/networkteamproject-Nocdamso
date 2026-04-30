@@ -21,14 +21,19 @@ public class GenerateChessBoard : MonoBehaviour
             for (int z = 0; z < 8; z++)
             {
                 GameObject spawnTile = (x + z) % 2 == 0 ? DarkTile : LightTile;
-
                 Vector3 position = new Vector3(x * TileSize, 1, z * TileSize);
 
                 GameObject tile = Instantiate(spawnTile, position, Quaternion.identity);
 
                 tile.transform.localScale = new Vector3(TileScale, TileScale, TileScale);
-
                 tile.transform.parent = this.transform;
+
+                if (tile.TryGetComponent(out TileHighlighter tileHighlighter))
+                {
+                    tileHighlighter.GridPos = new Vector2Int(x, z);
+
+                    ChessGameManager.instance.allTiles[x, z] = tileHighlighter;
+                }
             }
         }
     }

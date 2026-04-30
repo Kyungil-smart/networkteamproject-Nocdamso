@@ -59,31 +59,60 @@ public class PlayerInputManager : MonoBehaviour
         // 기물을 클릭했는지
         if (hitLayer == _pieceLayer)
         {
-            if (hitObj.TryGetComponent(out ChessPieceManager piece))
+            if (hitObj.TryGetComponent(out ChessPieceManager clickedPiece))
             {
-                SelectPiece(piece);
+                // 자신의 기물을 선택한 상태에서 상대 기물 클릭했다면
+                if (SelectedPiece != null && clickedPiece.isWhite != SelectedPiece.isWhite)
+                {
+                    // 상대 기물의 좌표를 가져와서 이동 시도
+                    TryMove(clickedPiece.GridPos, clickedPiece);
+                }
+
+                // 내 기물을 클릭하거나 클릭하기 전 이라면 해당 기물 선택
+                else if (clickedPiece.isWhite == ChessGameManager.instance.isWhiteTurn)
+                {
+                    SelectPiece(clickedPiece);
+                }
             }            
         }
-
 
         // 타일을 클릭했는지
         else if (hitLayer == _tileLayer && SelectedPiece != null)
         {
             if (hitObj.TryGetComponent(out TileHighlighter tile))
             {
-                // 이동 시 선택 해제
-                if (SelectedPiece.CanMove(tile.GridPos))
-                {
-                    SelectedPiece.MovePiece(tile.transform.position, tile.GridPos);
-                    Deselect();
-                }
+                TryMove(tile.GridPos);
+            }
+        }
+    }
 
-                // 이동할 수 없는 곳 클릭 시 선택 해제
-                else
+    private void TryMove(Vector2Int targetGridPos, ChessPieceManager enemyPiece = null)
+    {
+        if (SelectedPiece.CanMove(targetGridPos))
+        {
+            // 내 기물 선택 후 상대 기물을 클릭하면 그 기물의 좌표 사용, 타일 클릭했다면 배열에서 가져옴
+            ChessPieceManager target = enemyPiece ?? ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y];
+        
+            // 적 기물이라면 잡기
+            if (target != null && target.isWhite != SelectedPiece.isWhite)
+            {
+                if (TryGetComponent(out CaptureManager captureManager))
                 {
-                    Deselect();
+                    captureManager.Capture(target);
                 }
             }
+            // 이동
+            SelectedPiece.MovePiece(targetGridPos);
+
+            ChessGameManager.instance.ChangeTurn();
+            Deselect();                     
+        }
+
+        // 이동할 수 없는 곳 클릭 시 선택 해제
+        else
+        {
+            Deselect();
+
         }
     }
 
@@ -94,6 +123,7 @@ public class PlayerInputManager : MonoBehaviour
         SelectedPiece = piece;
         SelectedPiece.SetHighlight(true);
 
+        ChessGameManager.instance.ShowPossibleMoves(piece);
     }
 
     private void Deselect()
@@ -102,6 +132,8 @@ public class PlayerInputManager : MonoBehaviour
         {
             SelectedPiece.SetHighlight(false);
             SelectedPiece = null;
+
+            ChessGameManager.instance.ClearAllHighlights();
         }
     }
 }
