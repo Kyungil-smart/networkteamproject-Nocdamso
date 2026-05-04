@@ -4478,6 +4478,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d38df32f089058449a25089497c9542d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChessGameManager
+  isWhiteTurn: 1
 --- !u!4 &533988369
 Transform:
   m_ObjectHideFlags: 0
@@ -17034,7 +17035,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e15ba3475b25a07438dc56777dfc5631, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.76
+      value: 0.99
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e15ba3475b25a07438dc56777dfc5631, type: 3}
       propertyPath: m_LocalPosition.y
@@ -17042,7 +17043,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e15ba3475b25a07438dc56777dfc5631, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 29.31
+      value: 29.32
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e15ba3475b25a07438dc56777dfc5631, type: 3}
       propertyPath: m_LocalRotation.w
