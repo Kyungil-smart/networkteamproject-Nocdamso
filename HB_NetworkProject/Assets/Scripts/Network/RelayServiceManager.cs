@@ -27,7 +27,7 @@ public class RelayServiceManager : MonoBehaviour
     }
 
     // 호스트가 방 만들어달라고 요청하는 함수
-    public async Task<string> CreateRelayAsync(int maxPlayers = 2)
+    public async Task<string> CreateRelayAsync(int maxPlayers = 1)
     {
         try
         {
