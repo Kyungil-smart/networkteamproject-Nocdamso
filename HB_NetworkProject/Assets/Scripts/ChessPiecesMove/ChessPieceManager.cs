@@ -1,6 +1,7 @@
+using Unity.Netcode;
 using UnityEngine;
 
-public abstract class ChessPieceManager : MonoBehaviour
+public abstract class ChessPieceManager : NetworkBehaviour
 {
     [Header("기물SO")]
     public ChessPiecesSO PiecesSO;
@@ -19,21 +20,64 @@ public abstract class ChessPieceManager : MonoBehaviour
             SelectionPiece.SetActive(false);
         }
     }
-    
-    public virtual void SetHighlight(bool isOn)
+
+    // 기물은 서버가 소유함, 그러므로 이동요청
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    public void RequestMoveServerRpc(Vector2Int targetGridPos)
     {
-        if (SelectionPiece != null)
+        Debug.Log($"[서버] 이동 요청 수신: {name} -> {targetGridPos}");
+
+        // 서버에서 이동이 가능한지 검증요청
+        if (CanMove(targetGridPos))
         {
-            SelectionPiece.SetActive(isOn);
+            Debug.Log("[서버] 이동 검증 성공.");
+            // 이동할 곳에 상대 기물이 있다면 잡기
+            ChessPieceManager target = ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y];
+            if (target != null && target.isWhite != this.isWhite)
+            {
+                CaptureTargetClientRpc(targetGridPos);
+            }
+
+            // 이동가능하면 모든 클라이언트에게 이동 명령
+            MoveClientRpc(targetGridPos);
+
+            // 서버에서 턴 교대
+            ChessGameManager.instance.ChangeTurn();
+        }
+
+        else
+        {
+            Debug.LogWarning("[서버] 이동 검증 실패!");
         }
     }
 
-    public virtual void MovePiece(Vector2Int gridPos)
+    [ClientRpc]
+    private void CaptureTargetClientRpc(Vector2Int pos)
     {
-        // 이전 자리 비우기
+        ChessPieceManager target = ChessGameManager.instance.boardLayout[pos.x, pos.y];
+        if (target != null)
+        {
+            ChessGameManager.instance.boardLayout[pos.x, pos.y] = null;
+            Destroy(target.gameObject);
+        }
+    }
+
+    // 서버가 모든 클라이언트 화면 갱신
+    [ClientRpc]
+    private void MoveClientRpc(Vector2Int targetGridPos)
+    {
+        MovePieceRpc(targetGridPos);
+    }
+
+    private void MovePieceRpc(Vector2Int gridPos)
+    {
+        // 기물 옮기기 전 자리 비우기
         Vector2Int previousPos = this.GridPos;
-        ChessGameManager.instance.boardLayout[previousPos.x, previousPos.y] = null;
-        
+        if (ChessGameManager.instance.boardLayout[previousPos.x, previousPos.y] == this)
+        {
+            ChessGameManager.instance.boardLayout[previousPos.x, previousPos.y] = null;
+        }
+
         // TileConverter로 좌표 계산
         Vector3 targetWorldPos = TileConverter.Instance.GridToWorld(gridPos.x, gridPos.y, transform.position.y);
 
@@ -47,8 +91,24 @@ public abstract class ChessPieceManager : MonoBehaviour
         ChessGameManager.instance.boardLayout[gridPos.x, gridPos.y] = this;
     }
 
+    public override void OnNetworkSpawn()
+    {
+        if (ChessGameManager.instance != null)
+        {
+            ChessGameManager.instance.boardLayout[GridPos.x, GridPos.y] = this;
+        }
+    }
+    
     // 각 기물별 이동 규칙
     public abstract bool CanMove(Vector2Int targetPos);
+
+    public virtual void SetHighlight(bool isOn)
+    {
+        if (SelectionPiece != null)
+        {
+            SelectionPiece.SetActive(isOn);
+        }
+    }
 
     public bool isAlly(int targetX, int targetZ)
     {

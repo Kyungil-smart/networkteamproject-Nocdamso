@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class GenerateChessPieces : MonoBehaviour
@@ -12,7 +13,10 @@ public class GenerateChessPieces : MonoBehaviour
 
     private void Start()
     {
-        GeneratePieces();
+        if (NetworkManager.Singleton.IsServer)
+        {
+            GeneratePieces();            
+        }
     }
 
     public void GeneratePieces()
@@ -32,9 +36,9 @@ public class GenerateChessPieces : MonoBehaviour
 
         var converter = TileConverter.Instance;
 
-        for (int z = 0; z < 8; z++)
+        for (int x = 0; x < 8; x++)
         {
-            for (int x = 0; x < 8; x++)
+            for (int z = 0; z < 8; z++)
             {
                 // 기물의 위치 숫자를 읽어와서 해당 칸이 비었다면 다음으로
                 ChessPieces type = (ChessPieces)layout[z, x];
@@ -44,28 +48,31 @@ public class GenerateChessPieces : MonoBehaviour
                 Vector3 spawnPos = converter.GridToWorld(x, z, 1f);
 
                 // z가 2보다 작으면 흑색 기물, 그 외면 백색 기물
-                GameObject[] chessTeamPiece = (z < 2) ? BlackPieces : WhitePieces;
+                GameObject[] chessTeamPiece = (z < 2) ? WhitePieces : BlackPieces;
                 GameObject chessPiece = chessTeamPiece[(int)type - 1];
 
                 if (chessPiece != null)
                 {
                     // 유니티 좌표에 기물 프리팹 생성 후 관리하기 편하게 정리
-                    GameObject gameObject = Instantiate(chessPiece, spawnPos, Quaternion.identity);
-                    gameObject.transform.parent = this.transform;
+                    GameObject gameObject = Instantiate(chessPiece, spawnPos, Quaternion.identity, this.transform);
 
                     // 흑색 기물은 180도 회전 시켜서 생성
                     if (z > 5) gameObject.transform.rotation = Quaternion.Euler(0, 180, 0);
+                    else gameObject.transform.rotation = Quaternion.identity;
 
-                    // 각 기물 스크립트 참조
                     ChessPieceManager chessPieceManager = gameObject.GetComponent<ChessPieceManager>();
-
                     if (chessPieceManager != null)
                     {
-                        // x, z값을 기물의 GridPos에 저장
+                        chessPieceManager.isWhite = (z < 2);
                         chessPieceManager.GridPos = new Vector2Int(x, z);
 
                         ChessGameManager.instance.boardLayout[x, z] = chessPieceManager;
                     }
+
+                    if (gameObject.TryGetComponent(out NetworkObject networkObject))
+                    {
+                        networkObject.Spawn();
+                    }            
                 }
             }
         }

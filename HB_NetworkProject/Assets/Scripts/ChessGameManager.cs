@@ -1,7 +1,7 @@
-using Unity.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
-public class ChessGameManager : MonoBehaviour
+public class ChessGameManager : NetworkBehaviour
 {
     public static ChessGameManager instance;
 
@@ -11,7 +11,7 @@ public class ChessGameManager : MonoBehaviour
     // 각 칸의 하이라이트를 관리하는 배열
     public TileHighlighter[,] allTiles = new TileHighlighter[8, 8];
 
-    public bool isWhiteTurn = true;
+    public NetworkVariable<bool> isWhiteTurn = new NetworkVariable<bool>(true);
 
     private void Awake()
     {
@@ -20,7 +20,8 @@ public class ChessGameManager : MonoBehaviour
 
     public void ChangeTurn()
     {
-        isWhiteTurn = !isWhiteTurn;
+        if (!IsServer) return;
+        isWhiteTurn.Value = !isWhiteTurn.Value;
     }
 
     // 모든 타일의 하이라이트를 끔

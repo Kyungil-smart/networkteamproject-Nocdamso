@@ -14,7 +14,7 @@ public class PlayerTeamColor : NetworkBehaviour
         };
 
         // 값이 할당되었는데 늦게 스폰된 경우
-        if (IsOwner)
+        if (PlayerColor.Value != TeamColor.None)
         {
             ViewPoint(PlayerColor.Value);
         }
@@ -30,15 +30,15 @@ public class PlayerTeamColor : NetworkBehaviour
 
         if (teamColor == TeamColor.White)
         {
-            mainCam.transform.position = new Vector3(8, 16, 19);
-            mainCam.transform.rotation = Quaternion.Euler(60, 180, 0);
+            mainCam.transform.position = new Vector3(8, 16, -3);
+            mainCam.transform.rotation = Quaternion.Euler(60, 0, 0);
             Debug.Log("<color=white>백, 선공!");
         }
 
         else if (teamColor == TeamColor.Black)
         {
-            mainCam.transform.position = new Vector3(8, 16, -3);
-            mainCam.transform.rotation = Quaternion.Euler(60, 0, 0);
+            mainCam.transform.position = new Vector3(8, 16, 19);
+            mainCam.transform.rotation = Quaternion.Euler(60, 180, 0);
             Debug.Log("<color=white>흑, 후공!");
         }
     }
