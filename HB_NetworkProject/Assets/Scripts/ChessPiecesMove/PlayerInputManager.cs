@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -55,6 +56,7 @@ public class PlayerInputManager : MonoBehaviour
     private void HitObject(GameObject hitObj)
     {
         int hitLayer = hitObj.layer;
+        Debug.Log($"클릭 레이어 번호: {hitLayer}, 설정된 Piece레이어: {_pieceLayer}");
         
         // 기물을 클릭했는지
         if (hitLayer == _pieceLayer)
@@ -66,14 +68,35 @@ public class PlayerInputManager : MonoBehaviour
                 {
                     // 상대 기물의 좌표를 가져와서 이동 시도
                     TryMove(clickedPiece.GridPos, clickedPiece);
+                    return;
                 }
 
-                // 내 기물을 클릭하거나 클릭하기 전 이라면 해당 기물 선택
-                else if (clickedPiece.isWhite == ChessGameManager.instance.isWhiteTurn)
+                var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerTeamColor>();
+                bool isMyPiece = (localPlayer.PlayerColor.Value == TeamColor.White && clickedPiece.isWhite) ||
+                                 (localPlayer.PlayerColor.Value == TeamColor.Black && !clickedPiece.isWhite);
+            
+                if (isMyPiece && clickedPiece.isWhite == ChessGameManager.instance.isWhiteTurn.Value)
                 {
+                    Debug.Log("<color=green>최종 성공: SelectPiece 호출됨!</color>");
                     SelectPiece(clickedPiece);
                 }
-            }            
+                else
+                {
+                    
+                    var myColor = localPlayer.PlayerColor.Value;
+                    var currentTurn = ChessGameManager.instance.isWhiteTurn.Value ? "백" : "흑";
+                    var pieceColor = clickedPiece.isWhite ? "백" : "흑";
+                    
+                    Debug.Log($"<color=red>[판정 실패]</color> 내 컬러: {myColor}, 기물 컬러: {pieceColor}, 현재 턴: {currentTurn}");
+                    Debug.Log($"상세조건 - 내 기물인가: {isMyPiece}, 턴이 맞는가: {clickedPiece.isWhite == ChessGameManager.instance.isWhiteTurn.Value}");
+                }
+
+            }  
+
+            else
+            {
+                Debug.LogError("[디버그] ChessPieceManager 컴포넌트를 찾을 수 없습니다!");
+            }    
         }
 
         // 타일을 클릭했는지
@@ -88,31 +111,32 @@ public class PlayerInputManager : MonoBehaviour
 
     private void TryMove(Vector2Int targetGridPos, ChessPieceManager enemyPiece = null)
     {
-        if (SelectedPiece.CanMove(targetGridPos))
-        {
-            // 내 기물 선택 후 상대 기물을 클릭하면 그 기물의 좌표 사용, 타일 클릭했다면 배열에서 가져옴
-            ChessPieceManager target = enemyPiece ?? ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y];
-        
-            // 적 기물이라면 잡기
-            if (target != null && target.isWhite != SelectedPiece.isWhite)
-            {
-                if (TryGetComponent(out CaptureManager captureManager))
-                {
-                    captureManager.Capture(target);
-                }
-            }
-            // 이동
-            SelectedPiece.MovePiece(targetGridPos);
+        // 내 네트워크 플레이어의 팀 컬러 가져옴
+        var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerTeamColor>();
+        TeamColor teamColor = localPlayer.PlayerColor.Value;
 
-            ChessGameManager.instance.ChangeTurn();
-            Deselect();                     
+        // 현재 보드상의 턴 가져옴
+        bool isWhiteTurn = ChessGameManager.instance.isWhiteTurn.Value;
+
+        // 내가 조작하려는 기물색 확인
+        bool selectedIsWhite = SelectedPiece.isWhite;
+
+        // 내 팀 컬러가 현재 턴이고, 기물도 같은 색이어야 함
+        bool isMyTurn = (teamColor == TeamColor.White && isWhiteTurn && selectedIsWhite) ||
+                        (teamColor == TeamColor.Black && !isWhiteTurn && !selectedIsWhite);
+
+        if (!isMyTurn)
+        {
+            Debug.Log("내 턴 아님");
+            Deselect();
+            return;
         }
 
-        // 이동할 수 없는 곳 클릭 시 선택 해제
-        else
+        if (SelectedPiece.CanMove(targetGridPos))
         {
-            Deselect();
+            SelectedPiece.RequestMoveServerRpc(targetGridPos);
 
+            Deselect();
         }
     }
 

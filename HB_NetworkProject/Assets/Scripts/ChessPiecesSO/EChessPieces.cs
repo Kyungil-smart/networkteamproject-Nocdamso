@@ -12,6 +12,7 @@ public enum ChessPieces
 
 public enum TeamColor
 {
+    None,
     White,
     Black
 }
