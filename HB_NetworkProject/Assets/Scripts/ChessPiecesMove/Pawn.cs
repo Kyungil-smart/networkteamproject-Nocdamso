@@ -11,8 +11,8 @@ public class Pawn : ChessPieceManager
         }
 
         // 흑, 백에 따른 전진방향 설정
-        int direction = isWhite ? -1: 1;
-        int forwardDistance = targetPos.y - GridPos.y;
+        int direction = isWhite ? 1: -1;
+        int forwardDistance = targetPos.y - GridPos.Value.y;
 
         if (distanceX == 0)
         {

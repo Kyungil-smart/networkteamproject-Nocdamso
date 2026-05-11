@@ -1,8 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Threading;
 using Unity.Netcode;
-using Unity.Services.Matchmaker.Models;
 using UnityEngine;
 
 public class AssignRandomTeam : NetworkBehaviour
@@ -63,12 +61,6 @@ public class AssignRandomTeam : NetworkBehaviour
                                         : (isHostWhite ? TeamColor.Black : TeamColor.White);
 
                     playerTeamColor.PlayerColor.Value = assigned;
-                    Debug.Log($"Client {client.ClientId}에게 {assigned}팀 배정 완료");
-                }
-                else
-                {
-                    // 만약 여기서 로그가 찍힌다면 대기시간 0.1f보다 길게
-                    Debug.LogError($"Client {client.ClientId}의 PlayerObject가 아직 생성되지 않음");
                 }
             }            
         }

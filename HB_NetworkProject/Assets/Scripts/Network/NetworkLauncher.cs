@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using Unity.Netcode;
 using Unity.Services.Authentication;
@@ -20,8 +21,11 @@ public class NetworkLauncher : MonoBehaviour
     {
         try
         {
-            // 유니티 엔진 서비스 초기화
-            await UnityServices.InitializeAsync();
+            if (UnityServices.State != ServicesInitializationState.Initialized)
+            {
+                // 유니티 엔진 서비스 초기화
+                await UnityServices.InitializeAsync();                
+            }
 
             // 로그인이 안 되어 있다면 익명 로그인 시도
             if (!AuthenticationService.Instance.IsSignedIn)
@@ -30,6 +34,9 @@ public class NetworkLauncher : MonoBehaviour
             }
 
             Debug.Log ($"[Launcher] 로그인 성공, ID: {AuthenticationService.Instance.PlayerId}");
+
+            if (_joinCodeDisplay != null) _joinCodeDisplay.text = "";
+            if (_codeInput != null) _codeInput.text = "";
         }
 
         catch (Exception e)
@@ -45,16 +52,36 @@ public class NetworkLauncher : MonoBehaviour
         if (_copyButton != null) _copyButton.onClick.AddListener(CopyCode);
         if (_startButton != null)
         {
+            _startButton.onClick.RemoveListener(SceneChange);
             _startButton.onClick.AddListener(SceneChange);
-            _startButton.gameObject.SetActive(false);
+
+            _startButton.gameObject.SetActive(true);
+            _startButton.interactable = false;
         }
 
         if (NetworkManager.Singleton != null)
         {
+            NetworkManager.Singleton.OnClientConnectedCallback -= ClientStatusChanged;
+            NetworkManager.Singleton.OnClientDisconnectCallback -= ClientStatusChanged;
+
             NetworkManager.Singleton.OnClientConnectedCallback += ClientStatusChanged;
             NetworkManager.Singleton.OnClientDisconnectCallback += ClientStatusChanged;
         }
 
+        StartCoroutine(WaitAndRegisterEvents());
+    }
+
+    private IEnumerator WaitAndRegisterEvents()
+    {
+        // NetworkManager가 싱글톤으로 등록될 때까지 대기
+        while (NetworkManager.Singleton == null) yield return null;
+
+        NetworkManager.Singleton.OnClientConnectedCallback -= ClientStatusChanged;
+        NetworkManager.Singleton.OnClientDisconnectCallback -= ClientStatusChanged;
+
+        NetworkManager.Singleton.OnClientConnectedCallback += ClientStatusChanged;
+        NetworkManager.Singleton.OnClientDisconnectCallback += ClientStatusChanged;
+        
         UpdateStartButton();
     }
     
@@ -80,8 +107,6 @@ public class NetworkLauncher : MonoBehaviour
         // 코드가 발급됐다면
         if (!string.IsNullOrEmpty(code))
         {
-            Debug.Log($"[Launcher] 방 생성 완료, 코드: {code}");
-
             if (_joinCodeDisplay != null)
             {
                 _joinCodeDisplay.text = code;
@@ -89,7 +114,7 @@ public class NetworkLauncher : MonoBehaviour
 
             NetworkManager.Singleton.StartHost();
 
-            if (_startButton != null) _startButton.gameObject.SetActive(true);
+            UpdateStartButton();
         }
 
     }
@@ -156,14 +181,25 @@ public class NetworkLauncher : MonoBehaviour
     // 클라이언트 접속/해제 시 실행
     private void ClientStatusChanged(ulong clientID)
     {
+        if(this == null) return;
+
+        StartCoroutine(WaitAndRefreshButton());
+    }
+
+    private IEnumerator WaitAndRefreshButton()
+    {
+        yield return null;
         UpdateStartButton();
     }
 
     private void UpdateStartButton()
     {
-        if(NetworkManager.Singleton == null) return;
+        Debug.Log($"[검사] IsServer: {NetworkManager.Singleton.IsServer}, 인원수: {NetworkManager.Singleton.ConnectedClients.Count}");
 
-        if (_startButton == null) return;
+        if(NetworkManager.Singleton == null) return;
+        if(!NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient) return;
+        if(NetworkManager.Singleton.ConnectedClients == null) return;
+        if(_startButton == null) return;
 
         // 호스트만 버튼 활성화
         if (NetworkManager.Singleton.IsServer)

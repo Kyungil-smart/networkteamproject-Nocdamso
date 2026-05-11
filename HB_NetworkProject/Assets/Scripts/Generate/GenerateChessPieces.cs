@@ -64,7 +64,7 @@ public class GenerateChessPieces : MonoBehaviour
                     if (chessPieceManager != null)
                     {
                         chessPieceManager.isWhite = (z < 2);
-                        chessPieceManager.GridPos = new Vector2Int(x, z);
+                        chessPieceManager.GridPos.Value = new Vector2Int(x, z);
 
                         ChessGameManager.instance.boardLayout[x, z] = chessPieceManager;
                     }

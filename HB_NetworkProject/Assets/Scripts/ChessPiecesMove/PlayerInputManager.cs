@@ -67,7 +67,7 @@ public class PlayerInputManager : MonoBehaviour
                 if (SelectedPiece != null && clickedPiece.isWhite != SelectedPiece.isWhite)
                 {
                     // 상대 기물의 좌표를 가져와서 이동 시도
-                    TryMove(clickedPiece.GridPos, clickedPiece);
+                    TryMove(clickedPiece.GridPos.Value, clickedPiece);
                     return;
                 }
 

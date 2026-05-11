@@ -31,6 +31,11 @@ public class RelayServiceManager : MonoBehaviour
     {
         try
         {
+            if (NetworkManager.Singleton == null)
+            {
+                return null;
+            }
+
             // 유니티 서버에 인원수만큼 방 할당요청
             Allocation allocation = await RelayService.Instance.CreateAllocationAsync(maxPlayers);
 
@@ -40,8 +45,8 @@ public class RelayServiceManager : MonoBehaviour
             // 방의 주소를 서버 데이터로 만듦
             RelayServerData serverData = AllocationUtils.ToRelayServerData(allocation, "dtls");
 
-            // 내 NetworkManager가 이 주소를 사용하도록 함
-            NetworkManager.Singleton.GetComponent<UnityTransport>().SetRelayServerData(serverData);
+            var Transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            Transport.SetRelayServerData(serverData);
 
             // 생성된 입장 코드 보여줌
             return joinCode;

@@ -1,5 +1,8 @@
 using Unity.Netcode;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class ChessGameManager : NetworkBehaviour
 {
@@ -13,9 +16,44 @@ public class ChessGameManager : NetworkBehaviour
 
     public NetworkVariable<bool> isWhiteTurn = new NetworkVariable<bool>(true);
 
+    [Header("게임 UI")]
+    public GameObject GameOverPanel;
+    public TextMeshProUGUI WinnerText;
+    public Button LobbyButton;
+
     private void Awake()
     {
+        QualitySettings.vSyncCount = 0; 
+        Application.targetFrameRate = 60;
         instance = this;
+    }
+
+    private void Start()
+    {
+        if(LobbyButton != null)
+        {
+            LobbyButton.onClick.AddListener(ReturnToLobby);
+        }
+    }
+
+    [ClientRpc]
+    public void ShowGameOverClientRpc(string winnerName)
+    {
+        if (GameOverPanel != null)
+        {
+            GameOverPanel.SetActive(true);
+            WinnerText.text = winnerName +" Win!";
+        }
+    }
+
+    public void ReturnToLobby()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+
+        SceneManager.LoadScene("InitScene");
     }
 
     public void ChangeTurn()
