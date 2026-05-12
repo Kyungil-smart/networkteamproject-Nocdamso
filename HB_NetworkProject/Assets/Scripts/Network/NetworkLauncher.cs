@@ -13,6 +13,7 @@ public class NetworkLauncher : MonoBehaviour
     [SerializeField] private Button _clientButton;
     [SerializeField] private Button _copyButton;
     [SerializeField] private Button _startButton;
+    [SerializeField] private Button _quitButton;
     [SerializeField] private TMP_InputField _joinCodeDisplay;
     [SerializeField] private TMP_InputField _codeInput;
 
@@ -47,26 +48,13 @@ public class NetworkLauncher : MonoBehaviour
 
     private void OnEnable()
     {
-        if (_hostButton != null) _hostButton.onClick.AddListener(StartHost);
-        if (_clientButton != null) _clientButton.onClick.AddListener(CodeInputUI);
-        if (_copyButton != null) _copyButton.onClick.AddListener(CopyCode);
-        if (_startButton != null)
-        {
-            _startButton.onClick.RemoveListener(SceneChange);
-            _startButton.onClick.AddListener(SceneChange);
-
-            _startButton.gameObject.SetActive(true);
-            _startButton.interactable = false;
-        }
-
-        if (NetworkManager.Singleton != null)
-        {
-            NetworkManager.Singleton.OnClientConnectedCallback -= ClientStatusChanged;
-            NetworkManager.Singleton.OnClientDisconnectCallback -= ClientStatusChanged;
-
-            NetworkManager.Singleton.OnClientConnectedCallback += ClientStatusChanged;
-            NetworkManager.Singleton.OnClientDisconnectCallback += ClientStatusChanged;
-        }
+        _hostButton.onClick.AddListener(StartHost);
+        _clientButton.onClick.AddListener(CodeInputUI);
+        _copyButton.onClick.AddListener(CopyCode);
+        _quitButton.onClick.AddListener(QuitGame);
+        _startButton.onClick.AddListener(SceneChange);
+        
+        _startButton.interactable = false;
 
         StartCoroutine(WaitAndRegisterEvents());
     }
@@ -90,6 +78,7 @@ public class NetworkLauncher : MonoBehaviour
         if (_hostButton != null) _hostButton.onClick.RemoveListener(StartHost);
         if (_clientButton != null) _clientButton.onClick.RemoveListener(CodeInputUI);
         if (_copyButton != null) _copyButton.onClick.RemoveListener(CopyCode);
+        if (_quitButton != null) _quitButton.onClick.RemoveListener(QuitGame);
         if (_startButton != null) _startButton.onClick.RemoveListener(SceneChange);
         if (NetworkManager.Singleton != null)
         {
@@ -194,12 +183,9 @@ public class NetworkLauncher : MonoBehaviour
 
     private void UpdateStartButton()
     {
-        Debug.Log($"[검사] IsServer: {NetworkManager.Singleton.IsServer}, 인원수: {NetworkManager.Singleton.ConnectedClients.Count}");
+        
 
-        if(NetworkManager.Singleton == null) return;
-        if(!NetworkManager.Singleton.IsServer && !NetworkManager.Singleton.IsClient) return;
-        if(NetworkManager.Singleton.ConnectedClients == null) return;
-        if(_startButton == null) return;
+        if(NetworkManager.Singleton == null || _startButton == null) return;
 
         // 호스트만 버튼 활성화
         if (NetworkManager.Singleton.IsServer)
@@ -213,7 +199,7 @@ public class NetworkLauncher : MonoBehaviour
             Debug.Log($"접속 인원 : {clientCount}");
         }
 
-        else
+        else if (NetworkManager.Singleton.IsClient)
         {
             // 클리이언트는 버튼은 보이나
             _startButton.gameObject.SetActive(true);
@@ -221,5 +207,21 @@ public class NetworkLauncher : MonoBehaviour
             // 클릭할 순 없음
             _startButton.interactable = false;
         }
+
+        else
+        {
+            _startButton.interactable = false;
+        }
+    }
+
+    public void QuitGame()
+    {
+#if UNITY_EDITOR
+        // 에디터 플레이모드 종료
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        // 빌드 게임 종료
+        Application.Quit();
+#endif
     }
 }
