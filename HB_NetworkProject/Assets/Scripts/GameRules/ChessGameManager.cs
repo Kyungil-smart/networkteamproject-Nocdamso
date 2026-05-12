@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class ChessGameManager : NetworkBehaviour
 {
@@ -21,6 +22,8 @@ public class ChessGameManager : NetworkBehaviour
     public TextMeshProUGUI WinnerText;
     public Button LobbyButton;
 
+    private Coroutine _victoryCountdownRoutine;
+
     private void Awake()
     {
         QualitySettings.vSyncCount = 0; 
@@ -33,6 +36,74 @@ public class ChessGameManager : NetworkBehaviour
         if(LobbyButton != null)
         {
             LobbyButton.onClick.AddListener(ReturnToLobby);
+        }
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback += PlayerDisconnected;
+            NetworkManager.Singleton.OnClientConnectedCallback += PlayerConnected;
+        }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if(NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientDisconnectCallback -= PlayerDisconnected;
+            NetworkManager.Singleton.OnClientConnectedCallback -= PlayerConnected;
+        }
+    }
+
+    private void PlayerDisconnected(ulong clientId)
+    {
+        if (GameOverPanel.activeSelf) return;
+
+        // 내가 호스트일 때 클라이언트 나감
+        if (IsServer && clientId != NetworkManager.Singleton.LocalClientId)
+        {
+            // 5초 대기 후 승리 패널띄우는 코루틴 실행
+            if(_victoryCountdownRoutine != null)
+            {
+                StopCoroutine(_victoryCountdownRoutine);
+            }
+
+            _victoryCountdownRoutine = StartCoroutine(VictoryCountdownRoutine());
+        }
+    }
+
+    private void PlayerConnected(ulong ClientId)
+    {
+        if(_victoryCountdownRoutine != null)
+        {
+            StopCoroutine(_victoryCountdownRoutine);
+            _victoryCountdownRoutine = null;
+        }
+    }
+
+
+    private IEnumerator VictoryCountdownRoutine()
+    {
+        yield return new WaitForSeconds(5f);
+
+        if (NetworkManager.Singleton.ConnectedClients.Count <= 1)
+        {
+            ShowVictory("Opponent Disconnected");
+        }
+    }
+
+    private void ShowVictory(string message)
+    {
+        if (GameOverPanel != null)
+        {
+            GameOverPanel.SetActive(true);
+            
+            if (WinnerText != null)
+            {
+                WinnerText.text = message;
+            }
         }
     }
 
@@ -52,6 +123,8 @@ public class ChessGameManager : NetworkBehaviour
         {
             NetworkManager.Singleton.Shutdown();
         }
+        
+        StopAllCoroutines();
 
         SceneManager.LoadScene("InitScene");
     }
