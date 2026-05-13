@@ -48,6 +48,7 @@ public class GenerateChessPieces : MonoBehaviour
                 Vector3 spawnPos = converter.GridToWorld(x, z, 1f);
 
                 // z가 2보다 작으면 흑색 기물, 그 외면 백색 기물
+                bool isWhiteTeam = (z < 2);
                 GameObject[] chessTeamPiece = (z < 2) ? WhitePieces : BlackPieces;
                 GameObject chessPiece = chessTeamPiece[(int)type - 1];
 
@@ -63,7 +64,9 @@ public class GenerateChessPieces : MonoBehaviour
                     ChessPieceManager chessPieceManager = gameObject.GetComponent<ChessPieceManager>();
                     if (chessPieceManager != null)
                     {
-                        chessPieceManager.isWhite = (z < 2);
+                        chessPieceManager.teamColor.Value = isWhiteTeam ? TeamColor.White : TeamColor.Black;
+                        chessPieceManager.pieceType = type;
+
                         chessPieceManager.GridPos.Value = new Vector2Int(x, z);
 
                         ChessGameManager.instance.boardLayout[x, z] = chessPieceManager;

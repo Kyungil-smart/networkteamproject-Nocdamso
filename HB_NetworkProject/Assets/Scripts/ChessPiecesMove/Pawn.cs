@@ -24,7 +24,7 @@ public class Pawn : ChessPieceManager
             }
 
             // 첫 이동 시 두 칸 전진 가능
-            if (!isMoved && forwardDistance == direction * 2)
+            if (!isMoved.Value && forwardDistance == direction * 2)
             {
                 return !isPathBlocked(targetPos) && 
                 ChessGameManager.instance.boardLayout[targetPos.x, targetPos.y] == null;
@@ -39,6 +39,22 @@ public class Pawn : ChessPieceManager
             return target != null && target.isWhite != this.isWhite;
         }
 
+        if (Mathf.Abs(targetPos.x - GridPos.Value.x) == 1 && targetPos.y == (isWhite ? 5 : 2))
+        {
+            // 내 폰 옆에 있는 상대 폰이 두 칸 이동한 녀석인가
+            var target = ChessGameManager.instance.enPassantTarget;
+            if (target != null && target.GridPos.Value.x == targetPos.x && target.GridPos.Value.y == GridPos.Value.y)
+            {
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    public bool IsPromotionPosition(Vector2Int targetPos)
+    {
+        int promotionLine = isWhite ? 7 : 0;
+        return targetPos.y == promotionLine;
     }
 }
