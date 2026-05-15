@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using System.Data.Common;
 
 public class ChessGameManager : NetworkBehaviour
 {
@@ -21,6 +22,8 @@ public class ChessGameManager : NetworkBehaviour
     public GameObject GameOverPanel;
     public TextMeshProUGUI WinnerText;
     public Button LobbyButton;
+    public GameObject CheckPanel;
+    public GameObject MyTurnPanel;
 
     [Header("체크 상태")]
     public bool IsWhiteChecked = false;
@@ -70,6 +73,13 @@ public class ChessGameManager : NetworkBehaviour
             // 클라이언트 접속/해제 이벤트 구독
             NetworkManager.Singleton.OnClientDisconnectCallback += PlayerDisconnected;
             NetworkManager.Singleton.OnClientConnectedCallback += PlayerConnected;
+
+            isWhiteTurn.OnValueChanged += (oldVal, newVal) =>
+            {
+                if(IsServer) CheckStatus();    
+
+                PlayMyTurnSound(newVal);
+            };
         }
     }
 
@@ -123,6 +133,30 @@ public class ChessGameManager : NetworkBehaviour
         }
     }
 
+    private void PlayMyTurnSound(bool currentTurnIsWhite)
+    {
+        // 로컬 플레이어의 팀 컬러 정보 가져오기
+        var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerTeamColor>();
+        if (localPlayer == null) return;
+
+        TeamColor myColor = localPlayer.PlayerColor.Value;
+
+        // 현재 턴의 색상과 내 색상이 일치하는지 확인
+        bool isMyTurn = (currentTurnIsWhite && myColor == TeamColor.White) ||
+                        (!currentTurnIsWhite && myColor == TeamColor.Black);
+
+        if (isMyTurn)
+        {
+            if (AudioManager.instance != null)
+            {
+                // 내 차례 알림음 재생
+                AudioManager.instance.Play(SoundType.MyTurn);       
+            }
+
+            StartCoroutine(ShowMyTurnUICoroutine());
+        }
+    }
+
     // ---------------- 게임 UI -----------------------
 
 
@@ -132,9 +166,36 @@ public class ChessGameManager : NetworkBehaviour
         if (GameOverPanel != null)
         {
             GameOverPanel.SetActive(true);
-            WinnerText.text = winnerName.Contains("Disconnected") ? winnerName : winnerName + " Win";
 
-            AudioManager.instance.Play(SoundType.Victory);
+            // 기권승/패
+            if (winnerName.Contains("Disconnected"))
+            {
+                WinnerText.text = winnerName;
+                // 기권인 경우 승리 사운드 재생
+                AudioManager.instance.Play(SoundType.Victory);
+            }
+            else
+            {
+                WinnerText.text = winnerName + " Wins!";
+
+                //승리/패배 사운드 분기
+                var localPlayer = NetworkManager.Singleton.LocalClient.PlayerObject.GetComponent<PlayerTeamColor>();
+                string myColorStr = localPlayer.PlayerColor.Value == TeamColor.White ? "White" : "Black";
+
+                if (AudioManager.instance != null)
+                {
+                    // 승자 이름과 내 컬러가 같으면 승, 아니면 패
+                    if (winnerName == myColorStr)
+                    {
+                        AudioManager.instance.Play(SoundType.Victory);
+                    }
+
+                    else
+                    {
+                        AudioManager.instance.Play(SoundType.Defeat);
+                    }
+                }
+            }
         }
     }
 
@@ -150,28 +211,21 @@ public class ChessGameManager : NetworkBehaviour
         SceneManager.LoadScene("InitScene");
     }
 
+    private IEnumerator ShowMyTurnUICoroutine()
+{
+    if (MyTurnPanel != null)
+    {
+        MyTurnPanel.SetActive(true);
+        yield return new WaitForSeconds(0.5f); // 0.5초 대기
+        MyTurnPanel.SetActive(false);
+    }
+}
+
     // ---------------- 체스 게임 로직 ----------------
     public void ChangeTurn()
     {
-        // 앙파상은 해당 턴에만 가능하므로 초기화
-        enPassantTarget = null;
-
         if (!IsServer) return;
-
-        // 턴 넘기기 전 다음 턴 플레이어의 상태 확인
-        bool nextTurnIsWhite = !isWhiteTurn.Value;
-
-        if (IsCheckmate(nextTurnIsWhite))
-        {
-            // 체크메이트! 현재 플레이어 색상 전달
-            string winner = isWhiteTurn.Value ? "White" : "Black";
-            ShowGameOverClientRpc(winner + " (Checkmate)");
-            // 게임 끝났으니 턴 넘기지 않음
-            return;
-        }
-
-        // 체크메이트가 아니면 턴 교체
-        isWhiteTurn.Value = nextTurnIsWhite;
+        isWhiteTurn.Value = !isWhiteTurn.Value;
     }
 
     // 체스보드를 보고 체크 상태인지 확인
@@ -179,25 +233,8 @@ public class ChessGameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-
-        Vector2Int whiteKingPos = GetKingPosition(true);
-        Vector2Int blackKingPos = GetKingPosition(false);
-
-        bool whiteInCheck = false;
-        bool blackInCheck = false;
-
-        for (int x = 0; x < 8; x++)
-        {
-            for (int z= 0; z < 8; z++)
-            {
-                var piece = boardLayout[x, z];
-                if (piece == null) continue;
-
-                // 상대 기물이 우리 킹을 공격할 수 있는지
-                if (piece.teamColor.Value == TeamColor.White && piece.CanMove(blackKingPos)) blackInCheck = true;
-                if (piece.teamColor.Value == TeamColor.Black && piece.CanMove(whiteKingPos)) whiteInCheck = true;
-            }
-        }
+        bool whiteInCheck = IsKingAttacked(WhiteKingPos, TeamColor.Black);
+        bool blackInCheck = IsKingAttacked(BlackKingPos, TeamColor.White);
 
         // 체크 됐을 때 사운드 재생
         if ((whiteInCheck && !IsWhiteChecked) || (blackInCheck && !IsBlackChecked))
@@ -212,7 +249,22 @@ public class ChessGameManager : NetworkBehaviour
     [ClientRpc]
     private void PlayCheckSoundClientRpc()
     {
-        AudioManager.instance.Play(SoundType.Check);
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.Play(SoundType.Check);   
+        }
+
+        StartCoroutine (ShowCheckUICoroutine());
+    }
+
+    private IEnumerator ShowCheckUICoroutine()
+    {
+        if (CheckPanel != null)
+        {
+            CheckPanel.SetActive(true);
+            yield return new WaitForSeconds(1f);
+            CheckPanel.SetActive(false);
+        }
     }
 
     // 킹의 위치 찾기
@@ -250,35 +302,6 @@ public class ChessGameManager : NetworkBehaviour
         return false;
     } 
 
-    // 특정 기물을 옮겼을 때 우리 킹이 안전한지 가상 시뮬레이션
-    public bool SimulateMoveSafe(ChessPieceManager piece, Vector2Int targetPos)
-    {
-        Vector2Int originalPos = piece.GridPos.Value;
-        ChessPieceManager capturedPiece = boardLayout[targetPos.x, targetPos.y];
-        bool isSafe = false;
-
-        // 가상으로 움직임
-        boardLayout[originalPos.x, originalPos.y] = null;
-        boardLayout[targetPos.x, targetPos.y] = piece;
-
-        // 우리 킹 위치 찾고 공격 여부확인
-        TeamColor myColor = piece.teamColor.Value;
-        
-        TeamColor enemyColor = (myColor == TeamColor.White) ? TeamColor.Black : TeamColor.White;
-        Vector2Int kingPos = GetKingPosition(myColor == TeamColor.White);
-
-        if (!IsKingAttacked(kingPos, enemyColor))
-        {
-            isSafe = true;
-        }
-
-        // 위치 원복
-        boardLayout[originalPos.x, originalPos.y] = piece;
-        boardLayout[targetPos.x, targetPos.y] = capturedPiece;
-
-        return isSafe;
-    }
-
     // 프로모션 등 기물 생성이 필요할 때 프리팹을 반환하는 함수
     public GameObject GetPiecePrefab(ChessPieces type, bool isWhite)
     {
@@ -291,48 +314,6 @@ public class ChessGameManager : NetworkBehaviour
         }
         Debug.LogError($"[ChessGameManager] {type}에 해당하는 프리팹을 찾을 수 없습니다!");
         return null;
-    }
-
-    public bool IsCheckmate(bool isWhite)
-    {
-        // 현재 체크상태가 아니면 체크메이트도 아님
-        CheckStatus();
-        if (isWhite ? !IsWhiteChecked : !IsBlackChecked) return false;
-
-        // 현재 모든 기물 루프 돌며 체크를 피할 수 있는지 확인
-        for (int x = 0; x < 8; x++)
-        {
-            for (int y = 0; y < 8; y++)
-            {
-                ChessPieceManager piece = boardLayout[x, y];
-
-                // 현재 턴인 팀의 기물만 확인
-                if (piece != null && piece.isWhite == isWhite)
-                {
-                    // 이 기물이 갈 수 있는 모든 칸 시뮬레이션
-                    for (int tryX = 0; tryX < 8; tryX++)
-                    {
-                        for (int tryY = 0; tryY < 8; tryY++)
-                        {
-                            Vector2Int targetPos = new Vector2Int(tryX, tryY);
-
-                            // 기물의 기본 이동 규칙상 이동 가능 + 그 수를 뒀을 때 킹이 안전하다면
-                            if (piece.CanMove(targetPos))
-                            {
-                                if (SimulateMoveSafe(piece, targetPos))
-                                {
-                                    // 벗어날 수 있다면 체크메이트가 아님
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 탈출구가 없다면 체크메이트
-        return true;
     }
 
     // ------------- 타일 하이라이트 --------------
@@ -355,6 +336,7 @@ public class ChessGameManager : NetworkBehaviour
         {
             for (int z = 0; z < 8; z++)
             {
+                Vector2Int targetPos = new Vector2Int(x, z);
                 if (piece.CanMove(new Vector2Int(x, z)))
                 {
                     allTiles[x, z].SetTileHighlighter(true);

@@ -6,6 +6,7 @@ public enum SoundType
     Move,       // 기물 이동
     Capture,    // 기물 잡기
     Check,      // 체크 발생
+    MyTurn,     // 내 차례
     Victory,    // 승리
     Defeat      // 패배
 }
@@ -22,6 +23,8 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip moveSound;
     [SerializeField] private AudioClip captureSound;
     [SerializeField] private AudioClip checkSound;
+    [SerializeField] private AudioClip myTurnSound;
+
     [SerializeField] private AudioClip victorySound;
     [SerializeField] private AudioClip defeatSound;
 
@@ -66,6 +69,7 @@ public class AudioManager : MonoBehaviour
             SoundType.Move => moveSound,
             SoundType.Capture => captureSound,
             SoundType.Check => checkSound,
+            SoundType.MyTurn => myTurnSound,
             SoundType.Victory => victorySound,
             SoundType.Defeat => defeatSound,
             _ => null

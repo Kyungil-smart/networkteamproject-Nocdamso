@@ -111,50 +111,100 @@ public abstract class ChessPieceManager : NetworkBehaviour
         // 서버에서 이동이 가능한지 검증요청
         if (CanMove(targetGridPos))
         {
-            // 앙파상
-            if (pieceType == ChessPieces.Pawn && Mathf.Abs(targetGridPos.x - GridPos.Value.x) == 1 &&
-                ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y] == null)
+            ChessPieceManager target = ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y];
+            Vector2Int oldPos = GridPos.Value;
+
+            bool isCapture = false;
+            bool isKingCaptured = false;
+
+            // 잡기
+            if(target != null && target.isWhite != this.isWhite)
             {
-                // 대각선 이동인데 목적지가 비어있다면
-                Vector2Int capturePos = new Vector2Int(targetGridPos.x, GridPos.Value.y);
-                // 옆에 있는 폰 잡음
-                CaptureTargetClientRpc(capturePos);
+                isCapture = true;
+
+                // 잡히는 기물이 킹인지
+                if (target.pieceType == ChessPieces.King) isKingCaptured = true;
+
+                CaptureTargetClientRpc(targetGridPos);
+
+                //오브젝트 제거
+                if (target.NetworkObject != null && target.NetworkObject.IsSpawned)
+                {
+                    target.NetworkObject.Despawn();
+                }
             }
 
-            else
+            // 앙파상
+            else if (pieceType == ChessPieces.Pawn && Mathf.Abs(targetGridPos.x - oldPos.x) == 1 && target == null)
             {
-                // 이동할 곳에 상대 기물이 있다면 잡기
-                ChessPieceManager target = ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y];
-                if (target != null && target.isWhite != this.isWhite)
-                {
-                    CaptureTargetClientRpc(targetGridPos);
-                }    
-            }
+                Vector2Int capturePos = new Vector2Int(targetGridPos.x, oldPos.y);
+                ChessPieceManager enPassantPiece = ChessGameManager.instance.boardLayout[capturePos.x, capturePos.y];
             
-            int moveDistanceY = Mathf.Abs(targetGridPos.y - GridPos.Value.y);
-            if (pieceType == ChessPieces.Pawn && moveDistanceY == 2)
+                if (enPassantPiece != null && enPassantPiece.isWhite != this.isWhite)
+                {
+                    isCapture = true;
+                    
+                    CaptureTargetClientRpc(capturePos);
+                    if (enPassantPiece.NetworkObject != null && enPassantPiece.NetworkObject.IsSpawned)
+                    {
+                        enPassantPiece.NetworkObject.Despawn();
+                    }
+                }
+            }
+
+            // 내 위치 데이터 갱신
+            GridPos.Value = targetGridPos; 
+            isMoved.Value = true;
+            
+            ChessGameManager.instance.enPassantTarget = null;
+
+            // 폰이고 2칸 전진했다면 앙파상 타겟으로 설정
+            if (pieceType == ChessPieces.Pawn && Mathf.Abs(targetGridPos.y - oldPos.y) == 2)
             {
                 ChessGameManager.instance.enPassantTarget = this;
             }
             
-            // 킹이 2칸 이동했다면 캐슬링으로 간주
-            if (pieceType == ChessPieces.King && Mathf.Abs(targetGridPos.x - GridPos.Value.x) == 2)
+            // 캐슬링
+            // 킹이 2칸 이동했다면
+            if (pieceType == ChessPieces.King && Mathf.Abs(targetGridPos.x - oldPos.x) == 2)
             {
-                PerformCastling(targetGridPos);
+                PerformCastling(targetGridPos, oldPos);
             }
 
             // 이동가능하면 모든 클라이언트에게 이동 명령
             MoveClientRpc(targetGridPos);
 
-            bool IsPromotion = (pieceType == ChessPieces.Pawn && (isWhite ? targetGridPos.y == 7 : targetGridPos.y == 0));
-            
-            if (IsPromotion)
+            // 킹이 잡히면 게임종료
+            if (isKingCaptured)
             {
-                ShowPromotionUIClientRpc(targetGridPos, RpcTarget.Single(rpcParams.Receive.SenderClientId, RpcTargetUse.Temp));
+                string winnerName = this.isWhite ? "White" : "Black";
+                ChessGameManager.instance.ShowGameOverClientRpc(winnerName);
+                // 게임 종료 후 나머지 로직 실행 방지
+                return; 
             }
+
+            else if (isCapture)
+            {
+                PlaySoundClientRpc(SoundType.Capture);
+            }
+
             else
             {
-                ChessGameManager.instance.ChangeTurn();
+                PlaySoundClientRpc(SoundType.Move);
+            }
+
+            if (!isKingCaptured)
+            {
+                bool IsPromotion = (pieceType == ChessPieces.Pawn && (isWhite ? targetGridPos.y == 7 : targetGridPos.y == 0));
+                
+                if (IsPromotion)
+                {
+                    ShowPromotionUIClientRpc(targetGridPos, RpcTarget.Single(rpcParams.Receive.SenderClientId, RpcTargetUse.Temp));
+                }
+                else
+                {
+                    ChessGameManager.instance.ChangeTurn();
+                }        
             }
         }
 
@@ -164,15 +214,19 @@ public abstract class ChessPieceManager : NetworkBehaviour
         }
     }
 
-    private void PerformCastling(Vector2Int kingTargetPos)
+    private void PerformCastling(Vector2Int kingTargetPos, Vector2Int kingOldPos)
     {
-        int rookPosX = (kingTargetPos.x > GridPos.Value.x) ? 7 : 0;
-        int rookTargetX = (kingTargetPos.x > GridPos.Value.x) ? 5 : 3;
+        int rookPosX = (kingTargetPos.x > kingOldPos.x) ? 7 : 0;
+        int rookTargetX = (kingTargetPos.x > kingOldPos.x) ? 5 : 3;
 
         ChessPieceManager rook = ChessGameManager.instance.boardLayout[rookPosX, GridPos.Value.y];
         if (rook != null)
         {
-            rook.MoveClientRpc(new Vector2Int(rookTargetX, GridPos.Value.y));
+            rook.GridPos.Value = new Vector2Int(rookTargetX, kingTargetPos.y);
+
+            rook.isMoved.Value = true;
+
+            rook.MoveClientRpc(new Vector2Int(rookTargetX, kingTargetPos.y));
         }
     }
 
@@ -220,20 +274,14 @@ public abstract class ChessPieceManager : NetworkBehaviour
     [ClientRpc]
     private void CaptureTargetClientRpc(Vector2Int pos)
     {
-        ChessPieceManager target = ChessGameManager.instance.boardLayout[pos.x, pos.y];
-        if (target != null)
+        // 효과음 재생
+        if (AudioManager.instance != null) 
+            AudioManager.instance.Play(SoundType.Capture);
+
+        // 보드 배열에서만 미리 비워줌
+        if (ChessGameManager.instance != null)
         {
-            if (AudioManager.instance != null) AudioManager.instance.Play(SoundType.Capture);
-
-            // 만약 킹을 잡는 로직이 호출되었다면 게임 종료만 처리
-            if (target.pieceType == ChessPieces.King)
-            {
-                // 체크메이트 로직이 정상 작동한다면 이 코드는 예외 방지
-                return; 
-            }
-
             ChessGameManager.instance.boardLayout[pos.x, pos.y] = null;
-            Destroy(target.gameObject);
         }
     }
 
@@ -241,64 +289,10 @@ public abstract class ChessPieceManager : NetworkBehaviour
     [ClientRpc]
     private void MoveClientRpc(Vector2Int targetGridPos)
     {
-        // 기존 위치 비우기
-        Vector2Int oldPos = GridPos.Value;
-        if (oldPos.x >= 0 && oldPos.y >= 0)
-        {
-            if (ChessGameManager.instance.boardLayout[oldPos.x, oldPos.y] == this)
-                ChessGameManager.instance.boardLayout[oldPos.x, oldPos.y] = null;
-        }
-
-        // 실제 좌표 및 데이터 갱신
-        if (IsServer)
-        {
-            GridPos.Value = targetGridPos;
-            isMoved.Value = true;
-            if (pieceType == ChessPieces.King)
-                ChessGameManager.instance.UpdateKingPosition(isWhite, targetGridPos);
-        }
-
-        // 이동 및 새 위치 등록
-        transform.position = TileConverter.Instance.GridToWorld(targetGridPos.x, targetGridPos.y, transform.position.y);
-        ChessGameManager.instance.boardLayout[targetGridPos.x, targetGridPos.y] = this;
-
         // 효과음 및 체크 상태 확인
         if (AudioManager.instance != null) AudioManager.instance.Play(SoundType.Move);
         if (IsServer) ChessGameManager.instance.CheckStatus();
     }
-
-    private void MovePieceRpc(Vector2Int gridPos)
-    {
-        // 기물 옮기기 전 자리 비우기
-        Vector2Int previousPos = this.GridPos.Value;
-
-        if (previousPos.x >= 0 && previousPos.x < 8)
-        {
-            if (ChessGameManager.instance.boardLayout[previousPos.x, previousPos.y] == this)
-            {
-                ChessGameManager.instance.boardLayout[previousPos.x, previousPos.y] = null;
-            }
-        }
-
-        // 데이터 갱신
-        if (IsServer)
-        {
-            this.GridPos.Value = gridPos;   
-
-            this.isMoved.Value = true;
-
-            if (pieceType == ChessPieces.King)
-            {
-                ChessGameManager.instance.UpdateKingPosition(isWhite, gridPos);
-            }
-        }
-        
-        transform.position = TileConverter.Instance.GridToWorld(gridPos.x, gridPos.y, transform.position.y);
-        ChessGameManager.instance.boardLayout[gridPos.x, gridPos.y] = this;
-
-        RegisterToBoard(gridPos);
-    }
-
     
     // 각 기물별 이동 규칙
     public abstract bool CanMove(Vector2Int targetPos);
@@ -388,5 +382,14 @@ public abstract class ChessPieceManager : NetworkBehaviour
         }
 
         return false;
+    }
+
+    [ClientRpc]
+    private void PlaySoundClientRpc(SoundType type)
+    {
+        if (AudioManager.instance != null)
+        {
+            AudioManager.instance.Play(type);
+        }
     }
 }

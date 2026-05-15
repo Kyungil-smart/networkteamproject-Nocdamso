@@ -147,6 +147,11 @@ public class PlayerInputManager : MonoBehaviour
         SelectedPiece = piece;
         SelectedPiece.SetHighlight(true);
 
+        if(AudioManager.instance != null)
+        {
+            AudioManager.instance.Play(SoundType.Select);
+        }
+
         ChessGameManager.instance.ShowPossibleMoves(piece);
     }
 

@@ -36,19 +36,25 @@ public class Pawn : ChessPieceManager
         {
             // 대각선에 상대 기물이 있어야만 함
             ChessPieceManager target = ChessGameManager.instance.boardLayout[targetPos.x, targetPos.y];
-            return target != null && target.isWhite != this.isWhite;
-        }
 
-        if (Mathf.Abs(targetPos.x - GridPos.Value.x) == 1 && targetPos.y == (isWhite ? 5 : 2))
-        {
-            // 내 폰 옆에 있는 상대 폰이 두 칸 이동한 녀석인가
-            var target = ChessGameManager.instance.enPassantTarget;
-            if (target != null && target.GridPos.Value.x == targetPos.x && target.GridPos.Value.y == GridPos.Value.y)
+            // 일반 잡기
+            if (target != null)
             {
-                return true;
+                return target.isWhite != this.isWhite;
+            }
+
+            // 앙파상으로 잡기
+            var enpTarget = ChessGameManager.instance.enPassantTarget;
+            if (enpTarget != null)
+            {
+                // 타겟은 내 옆에 있어야 함
+                if (enpTarget.GridPos.Value.x == targetPos.x && enpTarget.GridPos.Value.y == GridPos.Value.y)
+                {
+                    // 상대 기물인가
+                    return enpTarget.isWhite != this.isWhite;
+                }
             }
         }
-
         return false;
     }
 
