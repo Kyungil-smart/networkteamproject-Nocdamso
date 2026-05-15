@@ -4,7 +4,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
-using System.Data.Common;
 
 public class ChessGameManager : NetworkBehaviour
 {
@@ -25,6 +24,14 @@ public class ChessGameManager : NetworkBehaviour
     public GameObject CheckPanel;
     public GameObject MyTurnPanel;
 
+    [Header("타이머")]
+    public TextMeshProUGUI TimerText;
+    public float TurnDuration = 30f;
+    public NetworkVariable<float> TimeRemaining = new NetworkVariable<float>(30f);
+
+    private int _lastDisplayedTime = -1;
+    private Coroutine _myTurnCoroutine;
+
     [Header("체크 상태")]
     public bool IsWhiteChecked = false;
     public bool IsBlackChecked = false;
@@ -33,8 +40,29 @@ public class ChessGameManager : NetworkBehaviour
     public Vector2Int WhiteKingPos;
     public Vector2Int BlackKingPos;
 
-    // 이번 턴에 두 칸 전진한 폰을 저장
-    public ChessPieceManager enPassantTarget { get; set; }
+    public NetworkVariable<NetworkObjectReference> enPassantTargetNet = new NetworkVariable<NetworkObjectReference>(
+    new NetworkObjectReference(), 
+    NetworkVariableReadPermission.Everyone, 
+    NetworkVariableWritePermission.Server);
+
+    public ChessPieceManager enPassantTarget 
+    {
+        get 
+        {
+            if (enPassantTargetNet.Value.TryGet(out NetworkObject netObj))
+            {
+                return netObj.GetComponent<ChessPieceManager>();
+            }
+            return null;
+        }
+        set 
+        {
+            if (value == null)
+                enPassantTargetNet.Value = new NetworkObjectReference();
+            else
+                enPassantTargetNet.Value = new NetworkObjectReference(value.NetworkObject);
+        }
+    }
 
     [System.Serializable]
     public struct PiecePrefabMap
@@ -64,22 +92,35 @@ public class ChessGameManager : NetworkBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (IsServer && !GameOverPanel.activeSelf)
+        {
+            if (TimeRemaining.Value > 0)
+            {
+                TimeRemaining.Value -= Time.deltaTime;
+            }
+
+            else
+            {
+                TimeRemaining.Value = TurnDuration;
+                ChangeTurn();
+            }
+        }
+
+        UpdateTimerUI();
+    }
+
     // ---------- 네트워크 이벤트 관리 ------------
 
     public override void OnNetworkSpawn()
     {
         if (NetworkManager.Singleton != null)
         {
-            // 클라이언트 접속/해제 이벤트 구독
+            isWhiteTurn.OnValueChanged += OnTurnChanged;
+
             NetworkManager.Singleton.OnClientDisconnectCallback += PlayerDisconnected;
             NetworkManager.Singleton.OnClientConnectedCallback += PlayerConnected;
-
-            isWhiteTurn.OnValueChanged += (oldVal, newVal) =>
-            {
-                if(IsServer) CheckStatus();    
-
-                PlayMyTurnSound(newVal);
-            };
         }
     }
 
@@ -88,9 +129,17 @@ public class ChessGameManager : NetworkBehaviour
         if(NetworkManager.Singleton != null)
         {
             // 구독해제
+            isWhiteTurn.OnValueChanged -= OnTurnChanged;
+
             NetworkManager.Singleton.OnClientDisconnectCallback -= PlayerDisconnected;
             NetworkManager.Singleton.OnClientConnectedCallback -= PlayerConnected;
         }
+    }
+
+    private void OnTurnChanged(bool oldVal, bool newVal)
+    {
+        if (IsServer) CheckStatus();
+        PlayMyTurnSound(newVal);
     }
 
     // 상대방 나갔을 때
@@ -153,8 +202,13 @@ public class ChessGameManager : NetworkBehaviour
                 AudioManager.instance.Play(SoundType.MyTurn);       
             }
 
-            StartCoroutine(ShowMyTurnUICoroutine());
-        }
+        if (_myTurnCoroutine != null)
+            {
+                StopCoroutine(_myTurnCoroutine);    
+            }
+
+            _myTurnCoroutine = StartCoroutine(ShowMyTurnUICoroutine());            
+        }           
     }
 
     // ---------------- 게임 UI -----------------------
@@ -212,20 +266,45 @@ public class ChessGameManager : NetworkBehaviour
     }
 
     private IEnumerator ShowMyTurnUICoroutine()
-{
-    if (MyTurnPanel != null)
     {
-        MyTurnPanel.SetActive(true);
-        yield return new WaitForSeconds(0.5f); // 0.5초 대기
-        MyTurnPanel.SetActive(false);
+        if (MyTurnPanel != null)
+        {
+            MyTurnPanel.SetActive(true);
+            yield return new WaitForSeconds(0.5f); // 0.5초 대기
+            MyTurnPanel.SetActive(false);
+        }
+
+        _myTurnCoroutine = null;
     }
-}
+
+    private void UpdateTimerUI()
+    {
+        if (TimerText == null) return;
+
+        // 현재 남은 시간을 정수로
+        int currentSeconds = Mathf.CeilToInt(Mathf.Max(0, TimeRemaining.Value));
+
+        // 초 단위가 숫자로 변했을 때만 실행
+        if (currentSeconds != _lastDisplayedTime)
+        {
+            _lastDisplayedTime = currentSeconds;
+
+            // 텍스트 갱신
+            TimerText.text = currentSeconds.ToString();
+
+            // 5초 이하 색변경
+            TimerText.color = currentSeconds <= 5 ? Color.red : Color.white;
+        }
+    }
 
     // ---------------- 체스 게임 로직 ----------------
     public void ChangeTurn()
     {
         if (!IsServer) return;
         isWhiteTurn.Value = !isWhiteTurn.Value;
+        TimeRemaining.Value = TurnDuration;
+
+        _lastDisplayedTime = -1;
     }
 
     // 체스보드를 보고 체크 상태인지 확인

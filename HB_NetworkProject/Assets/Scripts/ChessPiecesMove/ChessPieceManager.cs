@@ -169,6 +169,7 @@ public abstract class ChessPieceManager : NetworkBehaviour
             if (pieceType == ChessPieces.King && Mathf.Abs(targetGridPos.x - oldPos.x) == 2)
             {
                 PerformCastling(targetGridPos, oldPos);
+                PlaySoundClientRpc(SoundType.Move);
             }
 
             // 이동가능하면 모든 클라이언트에게 이동 명령
@@ -183,14 +184,17 @@ public abstract class ChessPieceManager : NetworkBehaviour
                 return; 
             }
 
-            else if (isCapture)
+            if (isCapture)
             {
                 PlaySoundClientRpc(SoundType.Capture);
             }
 
             else
             {
-                PlaySoundClientRpc(SoundType.Move);
+                if (!(pieceType == ChessPieces.King && Mathf.Abs(targetGridPos.x - oldPos.x) == 2))
+                {
+                    PlaySoundClientRpc(SoundType.Move);    
+                }
             }
 
             if (!isKingCaptured)
@@ -274,9 +278,7 @@ public abstract class ChessPieceManager : NetworkBehaviour
     [ClientRpc]
     private void CaptureTargetClientRpc(Vector2Int pos)
     {
-        // 효과음 재생
-        if (AudioManager.instance != null) 
-            AudioManager.instance.Play(SoundType.Capture);
+
 
         // 보드 배열에서만 미리 비워줌
         if (ChessGameManager.instance != null)
@@ -289,8 +291,7 @@ public abstract class ChessPieceManager : NetworkBehaviour
     [ClientRpc]
     private void MoveClientRpc(Vector2Int targetGridPos)
     {
-        // 효과음 및 체크 상태 확인
-        if (AudioManager.instance != null) AudioManager.instance.Play(SoundType.Move);
+        // 체크 상태 확인
         if (IsServer) ChessGameManager.instance.CheckStatus();
     }
     
